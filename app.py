@@ -7,7 +7,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from openai import OpenAI, APIConnectionError, APIStatusError, AuthenticationError, BadRequestError, RateLimitError
 
 APP_NAME = "Minha Letra AI"
-DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-6.1-terra")
+DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1")
 MAX_IMAGE_BYTES = 12 * 1024 * 1024
 MAX_IMAGE_SIDE = 2800
 
