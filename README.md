@@ -26,12 +26,12 @@ Aplicativo Streamlit para usar uma amostra manuscrita como referência visual e 
 
 ```toml
 OPENAI_API_KEY = "sua-chave-da-api"
-OPENAI_MODEL = "gpt-6.1-terra"
+OPENAI_MODEL = "gpt-4.1"
 ```
 
 4. Salve. Nunca adicione a chave a este repositório ou ao código-fonte.
 
-O modelo padrão configurado é `gpt-6.1-terra`. Se sua conta API não tiver acesso a ele, ajuste `OPENAI_MODEL` para um modelo com entrada de imagem habilitada na sua conta.
+O modelo padrão configurado é `gpt-4.1`. Se sua conta API não tiver acesso a ele, ajuste `OPENAI_MODEL` para um modelo com entrada de imagem habilitada na sua conta.
 
 ## Limites importantes
 
