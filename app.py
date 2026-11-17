@@ -4,10 +4,11 @@ import io
 import os
 import streamlit as st
 from PIL import Image, ImageOps, UnidentifiedImageError
-from openai import OpenAI, APIConnectionError, APIStatusError, AuthenticationError, BadRequestError, RateLimitError
+from google import genai
+from google.genai import types
 
 APP_NAME = "Minha Letra AI"
-DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1")
+DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
 MAX_IMAGE_BYTES = 12 * 1024 * 1024
 MAX_IMAGE_SIDE = 2800
 
@@ -72,11 +73,6 @@ def prepare_image(raw_bytes: bytes) -> bytes:
     return output.getvalue()
 
 
-def to_data_url(image_bytes: bytes) -> str:
-    encoded = base64.b64encode(image_bytes).decode("ascii")
-    return f"data:image/jpeg;base64,{encoded}"
-
-
 def build_prompt(mode: str, notes: str, corrections: list[dict[str, str]]) -> str:
     if mode == "Fiel ao caderno":
         instruction = "Transcreva fielmente. Preserve palavras, acentos, maiúsculas, pontuação, quebras de linha e erros do original. Não corrija."
@@ -111,25 +107,24 @@ Observações do usuário: {notes.strip() or "Nenhuma."}
 
 def transcribe(reference: bytes, page: bytes, mode: str, notes: str,
                corrections: list[dict[str, str]]) -> str:
-    api_key = get_secret("OPENAI_API_KEY")
+    api_key = get_secret("GEMINI_API_KEY")
     if not api_key:
-        raise RuntimeError("Configure OPENAI_API_KEY em Streamlit Settings → Secrets. Nunca coloque a chave no GitHub.")
-    model = get_secret("OPENAI_MODEL", DEFAULT_MODEL) or DEFAULT_MODEL
-    client = OpenAI(api_key=api_key)
-    response = client.responses.create(
+        raise RuntimeError("Configure GEMINI_API_KEY em Streamlit Settings → Secrets. Nunca coloque a chave no GitHub.")
+    model = get_secret("GEMINI_MODEL", DEFAULT_MODEL) or DEFAULT_MODEL
+    client = genai.Client(api_key=api_key)
+    response = client.models.generate_content(
         model=model,
-        input=[{"role": "user", "content": [
-            {"type": "input_text", "text": build_prompt(mode, notes, corrections)},
-            {"type": "input_image", "image_url": to_data_url(reference), "detail": "high"},
-            {"type": "input_image", "image_url": to_data_url(page), "detail": "high"},
-        ]}],
-        max_output_tokens=6000,
+        contents=[
+            build_prompt(mode, notes, corrections),
+            types.Part.from_bytes(data=reference, mime_type="image/jpeg"),
+            types.Part.from_bytes(data=page, mime_type="image/jpeg"),
+        ],
+        config=types.GenerateContentConfig(max_output_tokens=6000),
     )
-    result = (response.output_text or "").strip()
+    result = (response.text or '').strip()
     if not result:
-        raise RuntimeError("A IA não retornou texto. Tente outra foto, com mais iluminação e foco.")
+        raise RuntimeError("O Gemini não retornou texto. Tente outra foto, com mais iluminação e foco.")
     return result
-
 
 for key, default in {
     "handwriting_reference": None,
@@ -218,16 +213,7 @@ with tab_transcribe:
                 st.success("Transcrição concluída. Revise o resultado.")
             except ValueError as exc:
                 st.error(str(exc))
-            except AuthenticationError:
-                st.error("A API recusou a chave. Verifique a configuração com o responsável.")
-            except RateLimitError:
-                st.error("O limite ou saldo da API foi atingido. Confira o uso e a cobrança com o responsável.")
-            except APIConnectionError:
-                st.error("Não consegui conectar à API. Confira sua internet e tente novamente.")
-            except BadRequestError as exc:
-                st.error(f"A API não aceitou a solicitação: {exc}")
-            except APIStatusError as exc:
-                st.error(f"A API retornou erro HTTP {exc.status_code}. Confira o modelo configurado.")
+
             except RuntimeError as exc:
                 st.error(str(exc))
             except Exception as exc:
@@ -257,11 +243,11 @@ with tab_about:
     st.header("Como esta versão funciona")
     st.markdown("""
     1. Copie a ficha completa à mão e envie uma foto como amostra.
-    2. Ao transcrever, o app envia a amostra e a página juntas ao modelo de visão da OpenAI.
+    2. Ao transcrever, o app envia a amostra e a página juntas ao modelo de visão da Gemini.
     3. O modelo compara o formato das letras e tenta reconhecer o texto.
     4. Você pode corrigir o resultado e guardar exemplos durante a sessão.
     """)
     st.warning("Esta versão não treina nem altera permanentemente um modelo. A amostra e as correções são referências temporárias da sessão. Ao fechar ou perder a sessão, envie a amostra novamente. Nenhuma IA garante leitura perfeita.")
-    st.markdown("**Privacidade:** o código não grava suas fotos em banco de dados, mas as imagens são enviadas à API da OpenAI durante a transcrição. Não envie páginas com senhas ou informações privadas.")
+    st.markdown("**Privacidade:** o código não grava suas fotos em banco de dados, mas as imagens são enviadas à API da Gemini durante a transcrição. Não envie páginas com senhas ou informações privadas.")
     st.markdown("**Custos:** a API pode ser cobrada separadamente do ChatGPT. Configure a chave com ajuda de um responsável. Nunca compartilhe a chave nem a coloque no GitHub.")
-    st.caption(f"Modelo padrão: {DEFAULT_MODEL}. Pode ser alterado por OPENAI_MODEL no Streamlit Secrets.")
+    st.caption(f"Modelo padrão: {DEFAULT_MODEL}. Pode ser alterado por GEMINI_MODEL no Streamlit Secrets.")
